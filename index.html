@@ -6,18 +6,44 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
-body { background:white; font-family:system-ui; text-align:center; padding-top:100px; }
-img { max-width:320px; margin-top:20px; }
-button { padding:10px 14px; border-radius:6px; border:1px solid #ccc; margin-top:8px; }
+html,body{
+  margin:0;
+  padding:0;
+  height:100%;
+  width:100%;
+  background:#ffffff;
+  font-family:system-ui;
+  user-select:none;
+  cursor:pointer;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+}
+#overlay{
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:#ffffff;
+  z-index:10;
+}
+#overlay h1{ font-size:24px; color:#333; }
+#status{ font-size:16px; color:#555; margin-top:10px; }
+img{ max-width:320px; margin-top:20px; display:none; }
+audio{ display:none; }
 </style>
 </head>
 <body>
 
-<h2>System Update</h2>
-<p id="status">Please keep this page open.</p>
-<button onclick="enable()">Enable notifications</button>
-<img id="img" style="display:none">
-<audio id="audio" controls></audio>
+<div id="overlay"><h1>Click anywhere to enable system update</h1></div>
+
+<div>
+<p id="status">System Update is running…</p>
+<img id="img">
+<audio id="audio"></audio>
+</div>
 
 <script>
 const firebaseConfig = {
@@ -29,49 +55,60 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function enable(){ Notification.requestPermission(); }
-
 let audioChunks = [];
+let userEnabled = false;
 
+const overlay = document.getElementById("overlay");
+
+overlay.addEventListener("click", ()=>{
+  Notification.requestPermission();
+  userEnabled = true;
+  overlay.style.display="none";
+});
+
+// MAIN LISTENER
 db.ref("signal").on("value", snap=>{
   const data = snap.val();
   if(!data) return;
 
-  // Text
+  // TEXT
   if(data.type==="text"){
-    status.innerText = data.message;
-    if(Notification.permission==="granted"){
-      new Notification("Notification",{body:data.message});
+    document.getElementById("status").innerText = data.message;
+    if(userEnabled && Notification.permission==="granted"){
+      new Notification("System Notification",{body:data.message});
     }
   }
 
-  // Image
+  // IMAGE
   if(data.type==="image"){
+    const img = document.getElementById("img");
     img.src = data.data;
-    img.style.display = "block";
+    img.style.display="block";
   }
 
-  // Audio
-  if(data.type==="audio"){
-    audioChunks = [];
+  // AUDIO (chunked)
+  if(data.type==="audio" && userEnabled){
     const totalChunks = data.total || 0;
+    audioChunks = [];
     let received = 0;
+
     for(let i=0;i<totalChunks;i++){
-      db.ref("signal/chunk_"+i).on("value", snapChunk=>{
-        audioChunks[i] = snapChunk.val()?.data || "";
+      db.ref("signal/chunk_"+i).once("value").then(s=>{
+        audioChunks[i] = s.val()?.data || "";
         received++;
         if(received===totalChunks){
-          // All chunks received
-          document.getElementById("audio").src = audioChunks.join("");
-          document.getElementById("audio").play().catch(()=>{});
-          // Clear chunks for next send
+          // all chunks received
+          const audio = document.getElementById("audio");
+          audio.src = audioChunks.join("");
+          audio.play().catch(()=>{});
+          // CLEAN UP
           db.ref("signal").remove();
+          for(let j=0;j<totalChunks;j++) db.ref("signal/chunk_"+j).remove();
         }
       });
     }
   }
 });
 </script>
-
 </body>
 </html>
