@@ -6,43 +6,21 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  height:100%;
-  width:100%;
-  background:#ffffff;
-  font-family:system-ui;
-  user-select:none;
-  cursor:pointer;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-}
-#overlay{
-  position:absolute;
-  top:0;left:0;right:0;bottom:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:#ffffff;
-  z-index:10;
-}
-#overlay h1{ font-size:24px; color:#333; }
-#status{ font-size:16px; color:#555; margin-top:10px; }
-img{ max-width:320px; margin-top:20px; display:none; }
-audio{ display:none; }
+html,body{margin:0;padding:0;height:100%;width:100%;background:#ffffff;font-family:system-ui;user-select:none;cursor:pointer;display:flex;justify-content:center;align-items:center;text-align:center;}
+#overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;background:#ffffff;z-index:10;}
+#overlay h1{font-size:24px;color:#333;}
+#status{font-size:16px;color:#555;margin-top:10px;}
+img{max-width:320px;margin-top:20px;display:none;}
+audio{display:none;}
 </style>
 </head>
 <body>
 
 <div id="overlay"><h1>Click anywhere to enable system update</h1></div>
-
 <div>
 <p id="status">System Update is running…</p>
 <img id="img">
-<audio id="audio"></audio>
+<audio id="audio" controls></audio>
 </div>
 
 <script>
@@ -55,25 +33,23 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let audioChunks = [];
-let userEnabled = false;
-
-const overlay = document.getElementById("overlay");
-
-overlay.addEventListener("click", ()=>{
+let userEnabled=false;
+const overlay=document.getElementById("overlay");
+overlay.addEventListener("click",()=>{
   Notification.requestPermission();
-  userEnabled = true;
+  userEnabled=true;
   overlay.style.display="none";
 });
 
-// MAIN LISTENER
+let audioBuffer=[];
+
 db.ref("signal").on("value", snap=>{
-  const data = snap.val();
+  const data=snap.val();
   if(!data) return;
 
   // TEXT
   if(data.type==="text"){
-    document.getElementById("status").innerText = data.message;
+    document.getElementById("status").innerText=data.message;
     if(userEnabled && Notification.permission==="granted"){
       new Notification("System Notification",{body:data.message});
     }
@@ -81,29 +57,26 @@ db.ref("signal").on("value", snap=>{
 
   // IMAGE
   if(data.type==="image"){
-    const img = document.getElementById("img");
-    img.src = data.data;
-    img.style.display="block";
+    const imgEl=document.getElementById("img");
+    imgEl.src=data.data;
+    imgEl.style.display="block";
   }
 
-  // AUDIO (chunked)
+  // AUDIO
   if(data.type==="audio" && userEnabled){
-    const totalChunks = data.total || 0;
-    audioChunks = [];
-    let received = 0;
-
-    for(let i=0;i<totalChunks;i++){
-      db.ref("signal/chunk_"+i).once("value").then(s=>{
-        audioChunks[i] = s.val()?.data || "";
+    const total=data.total||0;
+    audioBuffer=new Array(total);
+    let received=0;
+    for(let i=0;i<total;i++){
+      db.ref("signal/chunk_"+i).once("value").then(snapChunk=>{
+        audioBuffer[i]=snapChunk.val()?.data||"";
         received++;
-        if(received===totalChunks){
-          // all chunks received
-          const audio = document.getElementById("audio");
-          audio.src = audioChunks.join("");
-          audio.play().catch(()=>{});
-          // CLEAN UP
+        if(received===total){
+          const audioEl=document.getElementById("audio");
+          audioEl.src=audioBuffer.join("");
+          audioEl.play().catch(()=>{});
           db.ref("signal").remove();
-          for(let j=0;j<totalChunks;j++) db.ref("signal/chunk_"+j).remove();
+          for(let j=0;j<total;j++) db.ref("signal/chunk_"+j).remove();
         }
       });
     }
