@@ -2,86 +2,91 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>System Update</title>
+<title>Receiver</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
-html,body{margin:0;padding:0;height:100%;width:100%;background:#ffffff;font-family:system-ui;user-select:none;cursor:pointer;display:flex;justify-content:center;align-items:center;text-align:center;}
-#overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;background:#ffffff;z-index:10;}
+html,body{margin:0;padding:0;height:100%;width:100%;background:#fff;font-family:sans-serif;cursor:pointer;display:flex;justify-content:center;align-items:center;text-align:center;}
+#overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;display:flex;justify-content:center;align-items:center;z-index:10;}
 #overlay h1{font-size:24px;color:#333;}
-#status{font-size:16px;color:#555;margin-top:10px;}
-img{max-width:320px;margin-top:20px;display:none;}
-audio{display:none;}
+#status{font-size:16px;margin-top:10px;}
+img{max-width:320px;margin-top:20px;}
+iframe{border:none;}
 </style>
 </head>
 <body>
 
-<div id="overlay"><h1>Click anywhere to enable system update</h1></div>
+<div id="overlay"><h1>Click anywhere to enable</h1></div>
 <div>
-<p id="status">System Update is running…</p>
+<p id="status">System Running...</p>
 <img id="img">
-<audio id="audio" controls></audio>
+<audio id="audio" controls style="display:none;"></audio>
+<div id="ytContainer"></div>
 </div>
 
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
-  authDomain: "notify-f0a18.firebaseapp.com",
-  databaseURL: "https://notify-f0a18-default-rtdb.firebaseio.com",
-  projectId: "notify-f0a18"
+  apiKey:"AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
+  authDomain:"notify-f0a18.firebaseapp.com",
+  databaseURL:"https://notify-f0a18-default-rtdb.firebaseio.com",
+  projectId:"notify-f0a18"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const db=firebase.database();
 
-let userEnabled=false;
-const overlay=document.getElementById("overlay");
-overlay.addEventListener("click",()=>{
+let enabled=false;
+document.getElementById("overlay").addEventListener("click",()=>{
   Notification.requestPermission();
-  userEnabled=true;
-  overlay.style.display="none";
+  enabled=true;
+  document.getElementById("overlay").style.display="none";
 });
 
-let audioBuffer=[];
-
-db.ref("signal").on("value", snap=>{
-  const data=snap.val();
-  if(!data) return;
-
-  // TEXT
-  if(data.type==="text"){
-    document.getElementById("status").innerText=data.message;
-    if(userEnabled && Notification.permission==="granted"){
-      new Notification("System Notification",{body:data.message});
-    }
+db.ref("signal").on("value",snap=>{
+  const d=snap.val();
+  if(!d) return;
+  
+  // Text
+  if(d.type==="text"){
+    document.getElementById("status").innerText=d.message;
+    if(enabled && Notification.permission==="granted")
+      new Notification("System",{body:d.message});
   }
-
-  // IMAGE
-  if(data.type==="image"){
+  
+  // Image
+  if(d.type==="image"){
     const imgEl=document.getElementById("img");
-    imgEl.src=data.data;
+    imgEl.src=d.data;
     imgEl.style.display="block";
   }
-
-  // AUDIO
-  if(data.type==="audio" && userEnabled){
-    const total=data.total||0;
-    audioBuffer=new Array(total);
-    let received=0;
-    for(let i=0;i<total;i++){
-      db.ref("signal/chunk_"+i).once("value").then(snapChunk=>{
-        audioBuffer[i]=snapChunk.val()?.data||"";
-        received++;
-        if(received===total){
-          const audioEl=document.getElementById("audio");
-          audioEl.src=audioBuffer.join("");
-          audioEl.play().catch(()=>{});
-          db.ref("signal").remove();
-          for(let j=0;j<total;j++) db.ref("signal/chunk_"+j).remove();
-        }
-      });
+  
+  // Audio
+  if(d.type==="audio" && enabled){
+    const audioEl=document.getElementById("audio");
+    audioEl.src=d.data;
+    audioEl.play().catch(()=>{});
+  }
+  
+  // YouTube
+  if(d.type==="youtube"){
+    const c=document.getElementById("ytContainer");
+    c.innerHTML="";
+    let url=d.url;
+    let embed=`https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?autoplay=1`;
+    if(d.mode==="hidden"){
+      const ifr=document.createElement("iframe");
+      ifr.src=embed;
+      ifr.width=1; ifr.height=1; ifr.style.position="absolute"; ifr.style.left="-1000px";
+      c.appendChild(ifr);
+    } else {
+      const ifr=document.createElement("iframe");
+      ifr.src=embed;
+      ifr.width=window.innerWidth;
+      ifr.height=window.innerHeight;
+      c.appendChild(ifr);
     }
   }
 });
 </script>
+
 </body>
 </html>
