@@ -3,32 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <title>System Update</title>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <style>
-body{
-  background:white;
-  font-family:system-ui;
-  text-align:center;
-  padding-top:120px;
-}
-img{
-  max-width:300px;
-  margin-top:20px;
-}
+body { background:white; font-family:system-ui; text-align:center; padding-top:100px; }
+img { max-width:320px; margin-top:20px; }
+button { padding:10px 14px; border-radius:6px; border:1px solid #ccc; margin-top:8px; }
 </style>
 </head>
 <body>
 
 <h2>System Update</h2>
 <p id="status">Please keep this page open.</p>
-
+<button onclick="enable()">Enable notifications</button>
 <img id="img" style="display:none">
-<audio id="audio"></audio>
-
-<button onclick="enable()">Enable Notifications</button>
+<audio id="audio" controls></audio>
 
 <script>
 const firebaseConfig = {
@@ -37,35 +26,49 @@ const firebaseConfig = {
   databaseURL: "https://notify-f0a18-default-rtdb.firebaseio.com",
   projectId: "notify-f0a18"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function enable(){
-  Notification.requestPermission();
-}
+function enable(){ Notification.requestPermission(); }
+
+let audioChunks = [];
 
 db.ref("signal").on("value", snap=>{
-  const d = snap.val();
-  if(!d) return;
+  const data = snap.val();
+  if(!data) return;
 
-  if(d.type === "text"){
-    document.getElementById("status").innerText = d.message;
-    if(Notification.permission === "granted"){
-      new Notification("System Notification",{body:d.message});
+  // Text
+  if(data.type==="text"){
+    status.innerText = data.message;
+    if(Notification.permission==="granted"){
+      new Notification("Notification",{body:data.message});
     }
   }
 
-  if(d.type === "image"){
-    const img = document.getElementById("img");
-    img.src = d.data;
+  // Image
+  if(data.type==="image"){
+    img.src = data.data;
     img.style.display = "block";
   }
 
-  if(d.type === "audio"){
-    const a = document.getElementById("audio");
-    a.src = d.data;
-    a.play().catch(()=>{});
+  // Audio
+  if(data.type==="audio"){
+    audioChunks = [];
+    const totalChunks = data.total || 0;
+    let received = 0;
+    for(let i=0;i<totalChunks;i++){
+      db.ref("signal/chunk_"+i).on("value", snapChunk=>{
+        audioChunks[i] = snapChunk.val()?.data || "";
+        received++;
+        if(received===totalChunks){
+          // All chunks received
+          document.getElementById("audio").src = audioChunks.join("");
+          document.getElementById("audio").play().catch(()=>{});
+          // Clear chunks for next send
+          db.ref("signal").remove();
+        }
+      });
+    }
   }
 });
 </script>
