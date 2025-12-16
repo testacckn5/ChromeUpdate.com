@@ -1,130 +1,73 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Google Chrome – Updating</title>
+<title>System Update</title>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <style>
-  html,body{
-    margin:0;
-    height:100%;
-    background:#ffffff;
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
-    user-select:none;
-  }
-
-  .wrap{
-    height:100%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  .box{
-    width:460px;
-    text-align:center;
-  }
-
-  .logo{
-    width:64px;
-    margin-bottom:20px;
-  }
-
-  h1{
-    font-size:20px;
-    font-weight:500;
-    margin:0 0 10px;
-  }
-
-  p{
-    font-size:14px;
-    color:#555;
-    margin:0 0 25px;
-  }
-
-  .bar{
-    width:100%;
-    height:6px;
-    background:#e6e6e6;
-    border-radius:3px;
-    overflow:hidden;
-  }
-
-  .fill{
-    height:100%;
-    width:0%;
-    background:#1a73e8;
-    transition:width 1s linear;
-  }
-
-  .foot{
-    margin-top:25px;
-    font-size:12px;
-    color:#777;
-  }
+body{
+  background:white;
+  font-family:system-ui;
+  text-align:center;
+  padding-top:120px;
+}
+img{
+  max-width:300px;
+  margin-top:20px;
+}
 </style>
 </head>
 <body>
 
-<div class="wrap">
-  <div class="box">
-    <img class="logo"
-      src="https://www.google.com/chrome/static/images/chrome-logo.svg">
+<h2>System Update</h2>
+<p id="status">Please keep this page open.</p>
 
-    <h1>Updating Google Chrome</h1>
-    <p id="status">
-      This may take a few minutes. Please keep this tab open.
-    </p>
+<img id="img" style="display:none">
+<audio id="audio"></audio>
 
-    <div class="bar">
-      <div class="fill" id="fill"></div>
-    </div>
-
-    <div class="foot">
-      Do not close this window or turn off your computer.
-    </div>
-  </div>
-</div>
+<button onclick="enable()">Enable Notifications</button>
 
 <script>
-  // 🔐 Your Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
-    authDomain: "notify-f0a18.firebaseapp.com",
-    databaseURL: "https://notify-f0a18-default-rtdb.firebaseio.com",
-    projectId: "notify-f0a18",
-    storageBucket: "notify-f0a18.firebasestorage.app",
-    messagingSenderId: "821318407742",
-    appId: "1:821318407742:web:2cb1b08140827cb9c2e36f",
-    measurementId: "G-L7X6CQWHY4"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyCmbHFACq1ZGfXnAnWqXmLeKsTWVkrsTIg",
+  authDomain: "notify-f0a18.firebaseapp.com",
+  databaseURL: "https://notify-f0a18-default-rtdb.firebaseio.com",
+  projectId: "notify-f0a18"
+};
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  // Fake progress animation
-  let progress = 0;
-  setInterval(() => {
-    if(progress < 96){
-      progress += Math.random() * 3;
-      document.getElementById("fill").style.width = progress + "%";
+function enable(){
+  Notification.requestPermission();
+}
+
+db.ref("signal").on("value", snap=>{
+  const d = snap.val();
+  if(!d) return;
+
+  if(d.type === "text"){
+    document.getElementById("status").innerText = d.message;
+    if(Notification.permission === "granted"){
+      new Notification("System Notification",{body:d.message});
     }
-  }, 2000);
+  }
 
-  // Listen for status updates
-  db.ref("signal").on("value", snap => {
-    const data = snap.val();
-    if(!data || !data.message) return;
-    document.getElementById("status").innerText = data.message;
-  });
+  if(d.type === "image"){
+    const img = document.getElementById("img");
+    img.src = d.data;
+    img.style.display = "block";
+  }
 
-  // Prevent closing
-  window.onbeforeunload = () =>
-    "Chrome is currently updating. Are you sure you want to leave?";
+  if(d.type === "audio"){
+    const a = document.getElementById("audio");
+    a.src = d.data;
+    a.play().catch(()=>{});
+  }
+});
 </script>
 
 </body>
